@@ -251,6 +251,12 @@ DEFAULTS: dict[str, Any] = {
         # None (default) disables; when enabled, off-topic queries abstain with
         # reason "no sufficiently close memory".
         "abstain_distance": None,
+        # Drafts (A16): when false (default), drafts are rendered with a [DRAFT]
+        # tag in search()/get_context() but excluded from answer()'s confident
+        # path — a draft is not yet verified and should not be presented as a
+        # confident answer. When true, drafts flow through answer() unmodified
+        # (the [DRAFT] tag still renders, so a reader can tell).
+        "include_drafts": False,
         # Temporal channel (§18.6): rerank raw-tier survivors when the query names
         # an absolute date/month/year. 0 disables; clamped to [0, 2] in code.
         "temporal_boost": 0.5, "graph_weight": 0.25,

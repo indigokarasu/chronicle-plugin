@@ -1450,10 +1450,18 @@ class RetrievalEngine:
         # non-empty on 30/30 unanswerable LongMemEval questions, which were then
         # answered at median confidence 0.600. Gate Tier 1 before the confident
         # path; see _support_gate and scripts/sweep_abstain.py.
-        supported = self._support_gate(t1, q)
-        if supported and self._confident(t1):
+        # A16: drafts are rendered with a [DRAFT] tag but excluded from the
+        # confident answer path — a draft is not yet verified and should not
+        # be presented as a confident answer. Respects retrieval.include_drafts.
+        _include_drafts = bool(self.cfg.get("retrieval.include_drafts", False)) if self.cfg else False
+        t1_active = t1 if _include_drafts else [
+            c for c in t1
+            if (self.store.get_belief(c["table"], c["belief_id"]) or {}).get("status") != "draft"
+        ]
+        supported = self._support_gate(t1_active, q)
+        if supported and self._confident(t1_active):
             self.store.log_retrieval(query, "*", top)
-            ans = self._answer_from_beliefs(t1, tier=1)
+            ans = self._answer_from_beliefs(t1_active, tier=1)
             ans["debug"] = route_info
             return ans
 
@@ -3112,14 +3120,16 @@ class RetrievalEngine:
         return not (row.get("info_label") == "secret" and purpose != "secret")
 
     def _render(self, b):
+        draft = b.get("status") == "draft"
+        prefix = "[DRAFT] " if draft else ""
         if b["kind"] == "fact":
             tag = "DERIVED" if b.get("source_type") == "inference" else "FACT"
-            return f"[{tag}] {b.get('attribute') or ''}: {b.get('value')} (conf {round(b.get('confidence') or 0, 2)})"
+            return f"{prefix}[{tag}] {b.get('attribute') or ''}: {b.get('value')} (conf {round(b.get('confidence') or 0, 2)})"
         if b["kind"] == "note":
-            return f"[NOTE] {b.get('value')}"
+            return f"{prefix}[NOTE] {b.get('value')}"
         if b["kind"] == "episode":
-            return f"[EPISODE] {b.get('value')}"
-        return f"[{b['kind'].upper()}] {b.get('value')}"
+            return f"{prefix}[EPISODE] {b.get('value')}"
+        return f"{prefix}[{b['kind'].upper()}] {b.get('value')}"
 
     def _render_fact(self, r):
         return {"belief_id": r["belief_id"], "attribute": r["attribute"], "value": r["value"],
